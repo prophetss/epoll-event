@@ -1,12 +1,14 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<sys/epoll.h>
-#include<unistd.h>
-#include<string.h>
-#include<fcntl.h>
-#include<sys/socket.h>
-#include<netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/epoll.h>
+#include <unistd.h>
+#include <string.h>
+#include <time.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include "epoll_event.h"
+#include "error.h"
 
 
 /*空操作，消除参数未使用报警*/
@@ -18,15 +20,31 @@
 /*epoll超时时间，单位ms*/
 #define EPOLL_TIMEOUT       10000
 
+static unsigned long long count = 0;
+
+static time_t t1, t2;
+
 void read_callback(ep_event_t *event, ep_element_t *element, struct epoll_event ee)
 {
     UNUSED(event);
     UNUSED(ee);
-    char buf[1024];
+
+    char buf[1024] = {0};
     int val = read(element->fd, buf, 1024);
-    if (val > 0) {
-        buf[val] = '\0';
-        printf(" received data:%s\n", buf);
+
+    if (val <= 0)
+        return;
+
+    printf("received data : %s\n", buf);
+    return;
+
+    if (count == 0)
+        t1 = time(NULL);
+
+    count++;
+    if (count % (1024 * 1024) == 0) {
+        t2 = time(NULL);
+        printf("received data %llu times, and used %lus\n", count, t2 - t1);
     }
 }
 
@@ -42,12 +60,15 @@ void close_callback(ep_event_t *event, ep_element_t *element, struct epoll_event
     UNUSED(event);
     UNUSED(ee);
 
+    printf("client closed, sd : %d\n", element->fd);
+
     ep_event_remove(event, element->fd);
 
     /*自定义数据自己定义自己处理*/
-    if(!element->custom_data) {
+    if (!element->custom_data) {
         free(element->custom_data);
         element->custom_data = NULL;
+
     }
 }
 
@@ -58,9 +79,9 @@ void error_callback(ep_event_t *event, ep_element_t *element, struct epoll_event
     UNUSED(ee);
 
     /*自定义数据自己定义自己处理*/
-    if(!element->custom_data) {
+    if (!element->custom_data) {
         element->custom_data = calloc(1, 32);
-        if(!element->custom_data) return;
+        if (!element->custom_data) return;
     }
 
     sprintf(element->custom_data, "error fd: %d\n", element->fd);
@@ -75,8 +96,7 @@ void accept_callback(ep_event_t *event, ep_element_t *element, struct epoll_even
     int listenfd = accept(element->fd, (struct sockaddr*) &sock_addr, &sock_len);
     fcntl(listenfd, F_SETFL, O_NONBLOCK);
     fprintf(stderr, "got the socket %d\n", listenfd);
-    uint32_t flags = EPOLLIN | EPOLLRDHUP | EPOLLHUP;
-    
+    uint32_t flags = EPOLLIN | EPOLLPRI | EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLERR;
     ep_element_t *ac_element;
     ep_event_add(event, listenfd, flags, &ac_element);
     ac_element->read_cb = read_callback;
@@ -89,9 +109,9 @@ void accept_callback(ep_event_t *event, ep_element_t *element, struct epoll_even
 int ep_timeout_callback(ep_event_t *event)
 {
     /*自定义数据自己定义自己处理*/
-    if(!event->event_data) {
+    if (!event->event_data) {
         event->event_data = calloc(1, sizeof(int));
-        if(!event->event_data) {
+        if (!event->event_data) {
             return -1;
         }
     }
@@ -124,10 +144,10 @@ int main()
 
     ep_element_t *element;
     ep_event_add(ee, sd, EPOLLIN, &element);
-
     element->read_cb = read_callback;
     element->accept_cb = accept_callback;
     element->close_cb = close_callback;
+
     ep_event_start(ee);
 
     return 0;

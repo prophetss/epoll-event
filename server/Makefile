@@ -4,8 +4,11 @@ DEBUG =	-O0 -Wall -Wextra -ggdb -DEPOLL_DEBUG
 SAMPLE = tar -xjf sample.tar.bz2
 SHELL_EXIST = $(shell if [ ! -e sample0.txt ]; then $(SAMPLE); fi;)
 
-epoll_server_test: $(EPOLL_SERVER_SRC)
+epoll_server_test_debug: $(EPOLL_SERVER_SRC)
 	gcc $(DEBUG) -o $@ $^ 
+	
+epoll_server_test: $(EPOLL_SERVER_SRC)
+	gcc -O2 -o $@ $^
 
 hash_test: $(SRC)
 	$(SHELL_EXIST)
