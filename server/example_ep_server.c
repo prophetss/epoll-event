@@ -11,7 +11,6 @@
 #include "error.h"
 
 
-/*空操作，消除参数未使用报警*/
 #define UNUSED(x)   (void)x
 
 /*server端口号*/

@@ -1,8 +1,8 @@
 #ifndef _EP_SERVER_H_
 #define _EP_SERVER_H_
 
-#include "hashtable.h"
 #include <sys/epoll.h>
+#include "hashtable.h"
 
 
 #define EP_MAX_ELEMENTS		1024
